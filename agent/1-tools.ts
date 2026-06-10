@@ -129,6 +129,27 @@ export function createTools(session: BrowserSession, hooks?: ToolHooks): ToolReg
         return result;
       },
     },
+
+    {
+      definition: {
+        type: "function",
+        function: {
+          name: "browser_has_class",
+          description:
+            "Check whether the first element matching a selector has a specific CSS class. Use this to verify an upvote actually registered: after clicking, a[id='up_12345'] gains the class 'nosee'.",
+          parameters: {
+            type: "object",
+            properties: {
+              selector: { type: "string", description: "CSS selector for the element to check." },
+              className: { type: "string", description: "The CSS class name to look for." },
+            },
+            required: ["selector", "className"],
+          },
+        },
+      },
+      execute: async ({ selector, className }) =>
+        session.hasClass(selector as string, className as string),
+    },
   ];
 
   return {

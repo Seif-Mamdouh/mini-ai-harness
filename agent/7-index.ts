@@ -11,7 +11,7 @@ import { BrowserSession } from "./browser.js";
 const TASK = "Upvote the top story on Hacker News (https://news.ycombinator.com). Tell me when it's done.";
 
 console.log(`Model:     ${MODEL}`);
-console.log(`Stage:     3 — action validation`);
+console.log(`Stage:     4 — verify & stop`);
 console.log(`Task:      ${TASK}\n`);
 
 const session = new BrowserSession();
@@ -19,7 +19,7 @@ const session = new BrowserSession();
 try {
   await session.open();
 
-  const guardrails = createGuardrails();
+  const guardrails = createGuardrails(session);
   const tools = createTools(session, guardrails.hooks);
   const messages = createContext(TASK);
   const result = await runLoop(MODEL, messages, tools, guardrails);
@@ -27,6 +27,10 @@ try {
   console.log(`\nAnswer:      ${result.answer}`);
   console.log(`Stopped by:  ${result.stoppedBy}`);
   console.log(`Iterations:  ${result.iterations}`);
+  console.log(`Verified:    ${result.verified === undefined ? "n/a" : result.verified}`);
+  if (result.verified === false) {
+    console.log(`\n⚠  The model reported done, but the harness could NOT verify the upvote. Not trusting it.`);
+  }
 } finally {
   await session.close();
 }

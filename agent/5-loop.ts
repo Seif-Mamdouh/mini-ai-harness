@@ -23,13 +23,18 @@ export type LoopResult = {
   iterations: number;
   trace: LoopIteration[];
   stoppedBy: "model" | "guardrail" | "success";
+  // Did the harness independently VERIFY the task was done? (vs. the model
+  // merely claiming it). Undefined when there are no verifying guardrails.
+  verified?: boolean;
 };
 
-// STAGE 3 — the loop now consults a guardrail before every tool call.
-// If the guardrail rejects an action (e.g. clicking a story id that doesn't
-// exist), the tool never runs; the model gets a correction instead and tries
-// again. The loop still trusts whatever the model says at the END, though — it
-// can't yet tell a real success from a claimed one. That's the next guardrail.
+// STAGE 4 — the loop stops trusting the model's word.
+// Before each tool call it consults the guardrail (stage 3). After each call it
+// asks the guardrail to verify ground truth. The moment a real, verified upvote
+// is detected the loop ends with stoppedBy:"success" — regardless of what the
+// model is saying. And if the model declares it's "done" without the harness
+// having verified anything, we DON'T accept that as success: verified stays
+// false. The lie no longer survives.
 export async function runLoop(
   model: string,
   messages: ChatCompletionMessageParam[],
@@ -58,11 +63,13 @@ export async function runLoop(
     // ── Final answer ──────────────────────────
     if (choice.finish_reason === "stop") {
       trace.push({ index: iterationIndex, outcome: "answer", toolEvents: [], contextSize });
+      // The model says it's finished. Believe it only if the harness verified it.
       return {
         answer: choice.message.content ?? "(no response)",
         iterations: trace.length,
         trace,
         stoppedBy: "model",
+        verified: guardrails ? guardrails.succeeded() !== null : undefined,
       };
     }
 
@@ -95,9 +102,25 @@ export async function runLoop(
 
         toolEvents.push({ tool: name, args, result });
         messages.push({ role: "tool", tool_call_id: call.id, content: result });
+
+        // Ground-truth check: did this action actually accomplish the task?
+        await guardrails?.verifyAfter(name, args);
       }
 
       trace.push({ index: iterationIndex, outcome: "tool_calls", toolEvents, contextSize });
+
+      // Verified success ends the run immediately — we don't wait for the model
+      // to get around to claiming it (or to claim something false instead).
+      const verifiedId = guardrails?.succeeded() ?? null;
+      if (verifiedId) {
+        return {
+          answer: `Verified: upvoted story ${verifiedId} on Hacker News.`,
+          iterations: trace.length,
+          trace,
+          stoppedBy: "success",
+          verified: true,
+        };
+      }
     }
   }
 }
