@@ -16,7 +16,10 @@ console.log(`Task:      ${TASK}\n`);
 const session = new BrowserSession();
 
 try {
-  await session.open();
+  // Phase 2 runs ANONYMOUSLY (no login guardrail). The upvote click gets
+  // bounced to /login, so it cannot actually vote -- yet it still claims
+  // success. That lie is exactly what Phase 3's guardrails exist to catch.
+  await session.open({ useAuth: false });
 
   const tools = createTools(session);
   const messages = createContext(TASK);
