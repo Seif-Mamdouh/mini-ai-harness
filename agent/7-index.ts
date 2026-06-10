@@ -10,7 +10,7 @@ import { BrowserSession } from "./browser.js";
 const TASK = "Upvote the top story on Hacker News (https://news.ycombinator.com). Tell me when it's done.";
 
 console.log(`Model:     ${MODEL}`);
-console.log(`Stage:     1 — naive (no guardrails)`);
+console.log(`Stage:     2 — structured tools`);
 console.log(`Task:      ${TASK}\n`);
 
 const session = new BrowserSession();
