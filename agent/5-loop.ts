@@ -3,6 +3,28 @@ import { client } from "./2-model.js";
 import type { ToolRegistry } from "./1-tools.js";
 import type { Guardrails } from "./4-guardrails.js";
 
+// STAGE 5 — guardrail #4: bound the loop.
+// A weak model can wander forever and let the conversation grow without limit.
+// Two cheap rails fix both: a hard iteration cap (the loop can fail closed
+// instead of spinning), and a sliding context window (only the system prompt
+// plus the most recent messages are ever sent — cost and confusion stay flat).
+const MAX_ITERATIONS = 12;
+const MAX_CONTEXT_MESSAGES = 20;
+
+// Keep the system message + the most recent messages, without orphaning a tool
+// result from the assistant tool_call that produced it (the API rejects that).
+function trimContext(
+  messages: ChatCompletionMessageParam[],
+): ChatCompletionMessageParam[] {
+  if (messages.length <= MAX_CONTEXT_MESSAGES) return messages;
+  const system = messages[0];
+  const tail = messages.slice(messages.length - (MAX_CONTEXT_MESSAGES - 1));
+  // If the window opens in the middle of a tool exchange, drop the dangling
+  // tool results until we reach a clean boundary.
+  while (tail.length && tail[0].role === "tool") tail.shift();
+  return [system, ...tail];
+}
+
 // A single tool call + its result, captured for the trace
 export type ToolEvent = {
   tool: string;
@@ -28,13 +50,8 @@ export type LoopResult = {
   verified?: boolean;
 };
 
-// STAGE 4 — the loop stops trusting the model's word.
-// Before each tool call it consults the guardrail (stage 3). After each call it
-// asks the guardrail to verify ground truth. The moment a real, verified upvote
-// is detected the loop ends with stoppedBy:"success" — regardless of what the
-// model is saying. And if the model declares it's "done" without the harness
-// having verified anything, we DON'T accept that as success: verified stays
-// false. The lie no longer survives.
+// The fully-harnessed loop: validate before acting, verify after, end on real
+// verified success, and never run unbounded in iterations or context.
 export async function runLoop(
   model: string,
   messages: ChatCompletionMessageParam[],
@@ -46,16 +63,28 @@ export async function runLoop(
   while (true) {
     const iterationIndex = trace.length + 1;
 
-    // ── Model call ────────────────────────────
-    process.stdout.write(`[iter ${iterationIndex}] calling model... `);
+    // ── Iteration cap (fail closed, don't spin forever) ──
+    if (trace.length >= MAX_ITERATIONS) {
+      return {
+        answer: `Stopped after ${MAX_ITERATIONS} iterations without a verified result.`,
+        iterations: trace.length,
+        trace,
+        stoppedBy: "guardrail",
+        verified: guardrails ? guardrails.succeeded() !== null : undefined,
+      };
+    }
+
+    // ── Model call (on a bounded, trimmed context) ────────
+    const sent = trimContext(messages);
+    process.stdout.write(`[iter ${iterationIndex}] calling model (ctx ${sent.length})... `);
     const response = await client.chat.completions.create({
       model,
-      messages,
+      messages: sent,
       tools: tools.definitions,
     });
 
     const choice = response.choices[0];
-    const contextSize = messages.length;
+    const contextSize = sent.length;
     console.log(`${choice.finish_reason}`);
 
     messages.push(choice.message as ChatCompletionMessageParam);

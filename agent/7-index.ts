@@ -11,7 +11,7 @@ import { BrowserSession } from "./browser.js";
 const TASK = "Upvote the top story on Hacker News (https://news.ycombinator.com). Tell me when it's done.";
 
 console.log(`Model:     ${MODEL}`);
-console.log(`Stage:     4 — verify & stop`);
+console.log(`Stage:     5 — bounded loop (final)`);
 console.log(`Task:      ${TASK}\n`);
 
 const session = new BrowserSession();
