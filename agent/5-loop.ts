@@ -60,6 +60,12 @@ export async function runLoop(
 ): Promise<LoopResult> {
   const trace: LoopIteration[] = [];
 
+  // ── Precondition guardrail: make the task possible before the agent starts.
+  // The harness ensures we're logged in; the agent never has to deal with it.
+  if (guardrails?.ensureReady) {
+    console.log(await guardrails.ensureReady());
+  }
+
   while (true) {
     const iterationIndex = trace.length + 1;
 

@@ -27,7 +27,8 @@ Notice what's *never* in those diffs: the task string in `agent/3-context.ts` an
 | `stage-2-structured-tools` | **structured view** — `browser_get_stories` returns clean JSON (rank, real id, voted status) | Stops inventing selectors; aims at ids that actually exist. Still can't verify, so it can still finish on a lie. |
 | `stage-3-validation` | **action validation** — `4-guardrails.ts` gates clicks against ids the agent has actually seen | A hallucinated id never reaches the browser; the model gets a precise correction back and retries. |
 | `stage-4-verify-and-stop` | **ground-truth verification** — `browser_has_class` + the harness checks the arrow flipped to `nosee` | Success is *observed*, not narrated. The loop ends on a verified vote; a model that claims "done" without proof yields `verified: false`. **The lie dies here.** |
-| `stage-5-bounded` *(= `main`)* | **bounded loop** — `MAX_ITERATIONS` cap + sliding `MAX_CONTEXT_MESSAGES` window | Can't spin forever or balloon context. The final, reliable demo. |
+| `stage-5-bounded` | **bounded loop** — `MAX_ITERATIONS` cap + sliding `MAX_CONTEXT_MESSAGES` window | Can't spin forever or balloon context. |
+| `stage-6-ensure-login` *(= `main`)* | **precondition guardrail** — `ensureReady()` checks login and auto-logs-in (from `.env`) before the loop starts | The harness guarantees voting is even possible; the agent never touches a login page. The final, self-sufficient demo. |
 
 ## Files
 
@@ -47,17 +48,22 @@ All in `agent/`, numbered in reading order:
 ```bash
 npm install
 npm run playwright:install        # downloads Chromium
-cp .env.example .env              # then put your OpenRouter key in it
-npm run login                     # one-time: log into HN, saves the session
+cp .env.example .env              # then add your API key + (optionally) HN credentials
 ```
 
-`npm run login` matters: upvoting on Hacker News only works while logged in. Without it, the click bounces to `/login` and nothing registers — which is precisely the failure stage 4's verification is built to catch. (Run the early stages without logging in and you'll see the agent lie about a vote that never happened.)
+Upvoting on Hacker News only works while logged in. On the final stage (`main` / `stage-6-ensure-login`) the harness logs in for you using `HN_USERNAME`/`HN_PASSWORD` from `.env` — so you don't have to do anything. The earlier stages (1–5) do **not** auto-login; without a session their click bounces to `/login` and nothing registers, which is precisely the failure stage 4's verification is built to catch.
+
+To establish a session yourself (for the earlier stages, or if HN throws a captcha at the auto-login):
+
+```bash
+npm run login                     # uses .env creds if set, else log in by hand
+```
 
 Then check out any stage and run it:
 
 ```bash
-git checkout stage-1-naive   && npm run agent   # watch it hallucinate
-git checkout stage-5-bounded && npm run agent   # watch it actually work
+git checkout stage-1-naive        && npm run agent   # watch it hallucinate & lie
+git checkout main                 && npm run agent   # logs itself in, then actually works
 ```
 
 The browser runs headed so you can watch the agent work in real time.
