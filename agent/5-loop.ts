@@ -74,7 +74,7 @@ export async function runLoop(
         const args = JSON.parse(call.function.arguments) as Record<string, unknown>;
 
         const tool = tools.byName.get(name);
-        process.stdout.write(`           → ${name}(${JSON.stringify(args)}) ... `);
+        process.stdout.write(`→ ${name}(${JSON.stringify(args)}) ... `);
         let result: string;
         try {
           result = tool ? await tool.execute(args) : `Unknown tool: "${name}"`;
