@@ -9,9 +9,9 @@ import { BrowserSession } from "./browser.js";
 // change what the agent is allowed to do and how the loop holds it accountable.
 const TASK = "Upvote the top story on Hacker News (https://news.ycombinator.com). Tell me when it's done.";
 
-console.log(`Model:     ${MODEL}`);
-console.log(`Stage:     1 — naive (no guardrails)`);
-console.log(`Task:      ${TASK}\n`);
+console.log(`Model: ${MODEL}`);
+console.log(`Stage: 1 — naive (no guardrails)`);
+console.log(`Task:${TASK}\n`);
 
 const session = new BrowserSession();
 
