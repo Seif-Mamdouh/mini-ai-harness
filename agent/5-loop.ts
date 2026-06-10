@@ -134,6 +134,9 @@ export async function runLoop(
             console.log(`error`);
           }
         }
+        // Show the audience exactly what the agent read back - not just "done".
+        console.log(result.slice(0, 1500).replace(/^/gm, "             | "));
+        if (result.length > 1500) console.log("             ... (+" + (result.length - 1500) + " more chars)");
 
         toolEvents.push({ tool: name, args, result });
         messages.push({ role: "tool", tool_call_id: call.id, content: result });
