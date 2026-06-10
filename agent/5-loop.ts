@@ -1,6 +1,7 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { client } from "./2-model.js";
 import type { ToolRegistry } from "./1-tools.js";
+import type { Guardrails } from "./4-guardrails.js";
 
 // A single tool call + its result, captured for the trace
 export type ToolEvent = {
@@ -24,16 +25,16 @@ export type LoopResult = {
   stoppedBy: "model" | "guardrail" | "success";
 };
 
-// STAGE 1 — no guardrails.
-// The loop runs until the model itself decides to stop talking. There is no
-// iteration cap, no context trimming, and crucially NO check that the task was
-// actually accomplished. Whatever the model says at the end, we believe. So
-// when it announces "I've upvoted the top story" — having clicked nothing real
-// — we faithfully report that lie as the result.
+// STAGE 3 — the loop now consults a guardrail before every tool call.
+// If the guardrail rejects an action (e.g. clicking a story id that doesn't
+// exist), the tool never runs; the model gets a correction instead and tries
+// again. The loop still trusts whatever the model says at the END, though — it
+// can't yet tell a real success from a claimed one. That's the next guardrail.
 export async function runLoop(
   model: string,
   messages: ChatCompletionMessageParam[],
   tools: ToolRegistry,
+  guardrails?: Guardrails,
 ): Promise<LoopResult> {
   const trace: LoopIteration[] = [];
 
@@ -76,12 +77,20 @@ export async function runLoop(
         const tool = tools.byName.get(name);
         process.stdout.write(`           → ${name}(${JSON.stringify(args)}) ... `);
         let result: string;
-        try {
-          result = tool ? await tool.execute(args) : `Unknown tool: "${name}"`;
-          console.log(`done`);
-        } catch (err) {
-          result = `Error: ${err instanceof Error ? err.message : String(err)}`;
-          console.log(`error`);
+
+        const correction = guardrails?.validate(name, args) ?? null;
+        if (correction) {
+          // Guardrail rejected the call — return the correction, never touch the browser.
+          result = correction;
+          console.log(`blocked`);
+        } else {
+          try {
+            result = tool ? await tool.execute(args) : `Unknown tool: "${name}"`;
+            console.log(`done`);
+          } catch (err) {
+            result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+            console.log(`error`);
+          }
         }
 
         toolEvents.push({ tool: name, args, result });
