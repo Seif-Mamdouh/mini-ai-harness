@@ -12,10 +12,11 @@ export class BrowserSession {
   // If a saved login state exists (created by `npm run login`), reuse it so the
   // agent acts as a logged-in HN user. Without it, upvotes redirect to /login —
   // which is exactly the failure the later-stage guardrails are built to catch.
-  async open(opts: { headless?: boolean } = {}): Promise<void> {
+  async open(opts: { headless?: boolean; useAuth?: boolean } = {}): Promise<void> {
     this.browser = await chromium.launch({ headless: opts.headless ?? false });
+    const useAuth = opts.useAuth ?? true;
     this.context = await this.browser.newContext(
-      existsSync(AUTH_STATE) ? { storageState: AUTH_STATE } : {},
+      useAuth && existsSync(AUTH_STATE) ? { storageState: AUTH_STATE } : {},
     );
     this.page = await this.context.newPage();
   }
