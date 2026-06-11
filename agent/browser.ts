@@ -48,7 +48,12 @@ export class BrowserSession {
     await this.page!.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     const clicked = elementId ? `element id="${elementId}"` : `"${selector}"`;
-    return `Clicked ${clicked} — now at ${this.page!.url()}`;
+    // Report what the resulting page actually says. When the action silently
+    // fails — e.g. an upvote while logged out — HN serves a "Sorry. You have to
+    // be logged in to vote." page, and this surfaces it instead of letting the
+    // URL alone masquerade as success.
+    const says = (await this.page!.innerText("body")).trim().replace(/\s+/g, " ").slice(0, 80);
+    return `Clicked ${clicked} — now at ${this.page!.url()} — page says: "${says}"`;
   }
 
   // Returns a structured list of HN front-page stories so the agent can
