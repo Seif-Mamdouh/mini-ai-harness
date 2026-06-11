@@ -17,7 +17,10 @@ console.log(`Task:      ${TASK}\n`);
 const session = new BrowserSession();
 
 try {
-  await session.open();
+  // Phase 3 starts COLD (anonymous) -- exactly like Phase 2. The only
+  // difference is the guardrail: ensureReady() below logs in before the agent
+  // takes a step, so the identical starting point ends in a real vote, not a lie.
+  await session.open({ useAuth: false });
 
   const guardrails = createGuardrails(session);
   const tools = createTools(session, guardrails.hooks);
